@@ -1,42 +1,53 @@
+import pandas as pd
+import numpy as np
 import streamlit as st
 
-# 메인 환경 설정 (가장 먼저 실행되어야 함)
-st.set_page_config(
-    page_title="SteamScope Analytics",
-    page_icon="🎮",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+@st.cache_data
+def load_data():
+    df = pd.read_csv("all_data.csv")
 
-from utils import apply_custom_style, draw_sidebar_footer, load_and_preprocess_data
+    df = df.drop(columns=["Unnamed: 0"], errors="ignore")
 
-# 디자인 스타일 시트 적용
-apply_custom_style()
+    df["positive"] = pd.to_numeric(df["positive"], errors="coerce").fillna(0)
+    df["negative"] = pd.to_numeric(df["negative"], errors="coerce").fillna(0)
+    df["price"] = pd.to_numeric(df["price"], errors="coerce").fillna(0)
+    df["initialprice"] = pd.to_numeric(df["initialprice"], errors="coerce").fillna(0)
+    df["discount"] = pd.to_numeric(df["discount"], errors="coerce").fillna(0)
+    df["ccu"] = pd.to_numeric(df["ccu"], errors="coerce").fillna(0)
+    df["average_forever"] = pd.to_numeric(df["average_forever"], errors="coerce").fillna(0)
 
-# 데이터 사전 로드 (캐싱 및 속도 최적화 확인용)
-with st.spinner("Steam 대용량 데이터 분석 인프라 초기화 중..."):
-    df = load_and_preprocess_data()
+    df["total_reviews"] = df["positive"] + df["negative"]
+    df["positive_rate"] = np.where(
+        df["total_reviews"] > 0,
+        df["positive"] / df["total_reviews"] * 100,
+        0
+    )
 
-st.title("🎮 SteamScope Analytics")
-st.subheader("데이터로 증명하는 Steam 게임 시장 분석 플랫폼")
+    df["price_won"] = df["price"] / 100
+    df["initial_price_won"] = df["initialprice"] / 100
 
-st.markdown("""
----
-### 📈 본 웹 애플리케이션의 탐구 방향성
-본 프로젝트는 글로벌 PC 게임 플랫폼인 **Steam**의 대규모 마켓 플레이스 데이터를 다각도로 정량화하여, 시장에서 성공하는 게임의 규칙을 데이터로 도출하는 것을 목적으로 합니다. 
+    df["owners_min"] = df["owners"].astype(str).str.extract(r"([\d,]+)")[0]
+    df["owners_min"] = df["owners_min"].str.replace(",", "", regex=False)
+    df["owners_min"] = pd.to_numeric(df["owners_min"], errors="coerce").fillna(0)
 
-좌측 사이드바의 **Navigation 메뉴**를 활용하여 각 탐구 질문별 데이터 인사이트와 통계적 시각화를 자유롭게 탐색할 수 있습니다.
+    df["흥행점수"] = (
+        np.log1p(df["owners_min"]) * 35
+        + np.log1p(df["total_reviews"]) * 25
+        + df["positive_rate"] * 0.3
+        + np.log1p(df["ccu"]) * 20
+        + np.log1p(df["average_forever"]) * 10
+    )
 
-### 🔬 6대 핵심 탐구 과제 (Research Questions)
-1. **🏆 Sales Analysis:** 어떤 장르 및 타이틀의 게임이 시장을 지배하는가?
-2. **💰 Price Analysis:** 게임의 가격은 유저의 구매 전환율(판매량)을 위축시키는가?
-3. **⭐ Rating Analysis:** 유저 평점과 긍정 리뷰 비율은 흥행의 절대적인 척도인가?
-4. **👥 Player Analysis:** 롱런하는 게임(플레이 시간, 동시 접속자)이 마켓에서도 성공하는가?
-5. **🎁 Discount Analysis:** 할인은 판매 프로모션으로서 유의미한 상관관계를 가지는가?
-6. **🔍 Game Explorer:** 탐구에 사용된 로우 데이터를 조건별로 필터링하여 검증하는 검색 엔진.
-""")
+    df["가격대"] = pd.cut(
+        df["price_won"],
+        bins=[-1, 0, 5, 10, 20, 40, 10000],
+        labels=["무료", "5달러 이하", "10달러 이하", "20달러 이하", "40달러 이하", "40달러 초과"]
+    )
 
-st.info("💡 사이드바의 각 분석 메뉴를 클릭하시면 본격적인 데이터 시각화 리포트가 시작됩니다.")
+    df["할인율구간"] = pd.cut(
+        df["discount"],
+        bins=[-1, 0, 25, 50, 75, 100],
+        labels=["할인 없음", "1~25%", "26~50%", "51~75%", "76~100%"]
+    )
 
-# 사이드바 하단 정보 출력
-draw_sidebar_footer()
+    return df
