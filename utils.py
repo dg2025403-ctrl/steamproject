@@ -1,129 +1,53 @@
-import streamlit as st
 import pandas as pd
 import numpy as np
+import streamlit as st
 
-# 글로벌 스타일 및 카드 디자인 폰트 CSS 정의
-def apply_custom_style():
-    st.markdown("""
-        <style>
-        /* 기본 배경 및 글자색 정의 */
-        .stApp {
-            background-color: #0E1117;
-            color: #FFFFFF;
-        }
-        /* 사이드바 스타일링 */
-        [data-testid="stSidebar"] {
-            background-color: #1E1E2F;
-        }
-        /* 메트릭 카드 컨테이너 디자인 */
-        .metric-card {
-            background-color: #1E1E2F;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-            border-left: 5px solid #00ADB5;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-            margin-bottom: 15px;
-        }
-        .metric-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 25px rgba(0, 173, 181, 0.4);
-        }
-        .metric-title {
-            font-size: 0.9rem;
-            color: #8B949E;
-            margin-bottom: 5px;
-            font-weight: 600;
-        }
-        .metric-value {
-            font-size: 1.6rem;
-            color: #FFD369;
-            font-weight: bold;
-        }
-        /* 푸터 스타일 */
-        .footer {
-            text-align: center;
-            padding: 30px 10px 10px 10px;
-            font-size: 0.85rem;
-            color: #6E7681;
-            border-top: 1px solid #1E1E2F;
-            margin-top: 50px;
-        }
-        /* 상단 여백 조절 */
-        .block-container {
-            padding-top: 2rem;
-            padding-bottom: 2rem;
-        }
-        </style>
-    """, unsafe_allow_html=True)
+@st.cache_data
+def load_data():
+    df = pd.read_csv("all_data.csv")
 
-def draw_metric_card(title, value):
-    st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-title">{title}</div>
-            <div class="metric-value">{value}</div>
-        </div>
-    """, unsafe_allow_html=True)
+    df = df.drop(columns=["Unnamed: 0"], errors="ignore")
 
-# Matplotlib 전역 스타일 설정 함수
-def set_matplotlib_style():
-    import matplotlib.pyplot as plt
-    plt.rcParams['figure.facecolor'] = '#0E1117'
-    plt.rcParams['axes.facecolor'] = '#1E1E2F'
-    plt.rcParams['text.color'] = '#FFFFFF'
-    plt.rcParams['axes.labelcolor'] = '#FFFFFF'
-    plt.rcParams['xtick.color'] = '#FFFFFF'
-    plt.rcParams['ytick.color'] = '#FFFFFF'
-    plt.rcParams['grid.color'] = '#2E2E3F'
-    plt.rcParams['axes.edgecolor'] = '#2E2E3F'
+    df["positive"] = pd.to_numeric(df["positive"], errors="coerce").fillna(0)
+    df["negative"] = pd.to_numeric(df["negative"], errors="coerce").fillna(0)
+    df["price"] = pd.to_numeric(df["price"], errors="coerce").fillna(0)
+    df["initialprice"] = pd.to_numeric(df["initialprice"], errors="coerce").fillna(0)
+    df["discount"] = pd.to_numeric(df["discount"], errors="coerce").fillna(0)
+    df["ccu"] = pd.to_numeric(df["ccu"], errors="coerce").fillna(0)
+    df["average_forever"] = pd.to_numeric(df["average_forever"], errors="coerce").fillna(0)
 
-@st.cache_data(show_spinner=False)
-def load_and_preprocess_data():
-    # 대용량 데이터 최적화를 위한 필수 컬럼 및 데이터 타입 정의
-    cols = [
-        'appid', 'name', 'developer', 'publisher', 'positive', 'negative', 
-        'userscore', 'owners', 'average_forever', 'average_2weeks', 
-        'median_forever', 'median_2weeks', 'price', 'initialprice', 'discount', 'ccu'
-    ]
-    
-    dtypes = {
-        'appid': 'int32',
-        'name': 'string',
-        'developer': 'string',
-        'publisher': 'string',
-        'positive': 'float64',
-        'negative': 'float64',
-        'userscore': 'float64',
-        'owners': 'string',
-        'average_forever': 'float64',
-        'average_2weeks': 'float64',
-        'median_forever': 'float64',
-        'median_2weeks': 'float64',
-        'price': 'float64',
-        'initialprice': 'float64',
-        'discount': 'float64',
-        'ccu': 'float64'
-    }
-    
-    # 1. 데이터 로드 (low_memory 및 usecols 최적화)
-    try:
-        df = pd.read_csv("all_data.csv", usecols=cols, dtype=dtypes, low_memory=False)
-    except Exception:
-        # 데이터가 없을 때를 대비한 모크 데이터 빌더 (안전성 확보)
-        np.random.seed(42)
-        n = 10000
-        mock_owners = ['0 .. 20,000', '20,000 .. 50,000', '1,000,000 .. 2,000,000', '10,000,000 .. 20,000,000']
-        df = pd.DataFrame({
-            'appid': np.arange(1, n+1),
-            'name': [f"Game {i}" for i in range(1, n+1)],
-            'developer': [f"Developer {i%50}" for i in range(1, n+1)],
-            'publisher': [f"Publisher {i%30}" for i in range(1, n+1)],
-            'positive': np.random.randint(0, 50000, size=n).astype(float),
-            'negative': np.random.randint(0, 10000, size=n).astype(float),
-            'userscore': np.random.randint(0, 100, size=n).astype(float),
-            'owners': np.random.choice(mock_owners, size=n),
-            'average_forever': np.random.randint(0, 5000, size=n).astype(float),
-            'average_2weeks': np.random.randint(0, 500, size=n).astype(float),
-            'median_forever': np.random.randint(0, 3000, size=n).astype(float),
-            'median_2weeks': np.random.randint(0, 200, size=n).astype(float),
-            'price': np.random.choice(
+    df["total_reviews"] = df["positive"] + df["negative"]
+    df["positive_rate"] = np.where(
+        df["total_reviews"] > 0,
+        df["positive"] / df["total_reviews"] * 100,
+        0
+    )
+
+    df["price_won"] = df["price"] / 100
+    df["initial_price_won"] = df["initialprice"] / 100
+
+    df["owners_min"] = df["owners"].astype(str).str.extract(r"([\d,]+)")[0]
+    df["owners_min"] = df["owners_min"].str.replace(",", "", regex=False)
+    df["owners_min"] = pd.to_numeric(df["owners_min"], errors="coerce").fillna(0)
+
+    df["흥행점수"] = (
+        np.log1p(df["owners_min"]) * 35
+        + np.log1p(df["total_reviews"]) * 25
+        + df["positive_rate"] * 0.3
+        + np.log1p(df["ccu"]) * 20
+        + np.log1p(df["average_forever"]) * 10
+    )
+
+    df["가격대"] = pd.cut(
+        df["price_won"],
+        bins=[-1, 0, 5, 10, 20, 40, 10000],
+        labels=["무료", "5달러 이하", "10달러 이하", "20달러 이하", "40달러 이하", "40달러 초과"]
+    )
+
+    df["할인율구간"] = pd.cut(
+        df["discount"],
+        bins=[-1, 0, 25, 50, 75, 100],
+        labels=["할인 없음", "1~25%", "26~50%", "51~75%", "76~100%"]
+    )
+
+    return df
